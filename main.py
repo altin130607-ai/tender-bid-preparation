@@ -1,4 +1,3 @@
-#Обновлено 20.05.2026,добавлена проверка статуса
 import sys
 from PySide6.QtWidgets import (QApplication, QWidget, QLabel, QLineEdit, QDateEdit,
                                QComboBox, QPushButton, QTableWidget, QTableWidgetItem,
