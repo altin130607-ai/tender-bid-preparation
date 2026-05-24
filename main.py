@@ -87,7 +87,6 @@ class MainWindow(QWidget):
         if not files:
             return
         for file_path in files:
-            # Копируем файл в папку uploaded_files
             base_name = os.path.basename(file_path)
             dest_path = os.path.join(self.upload_dir, base_name)
             shutil.copy(file_path, dest_path)
@@ -109,8 +108,8 @@ class MainWindow(QWidget):
         self.table.setItem(row, 1, QTableWidgetItem(self.companyEdit.text()))
         self.table.setItem(row, 2, QTableWidgetItem(self.nmckEdit.text() if self.nmckEdit.text() else "0"))
 
-        # Отображаем имена файлов (без полного пути)
-        file_names = "\n".join([os.path.basename(f) for f in self.filesList]) if self.filesList else "—"
+        # Отображаем имена файлов через запятую
+        file_names = ", ".join([os.path.basename(f) for f in self.filesList]) if self.filesList else "—"
         self.table.setItem(row, 3, QTableWidgetItem(file_names))
 
         self.table.setItem(row, 4, QTableWidgetItem(self.statusCombo.currentText()))
