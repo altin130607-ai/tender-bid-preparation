@@ -1,88 +1,91 @@
-// Массив заявок
 let bids = [];
 
-// Функция отрисовки таблицы
 function renderTable() {
   const tbody = document.getElementById('bidsBody');
   tbody.innerHTML = '';
 
   if (bids.length === 0) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Нет добавленных заявок</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7">Нет добавленных заявок</td></tr>';
     return;
   }
 
-  bids.forEach((bid, index) => {
-    const row = tbody.insertRow();
-
+  bids.forEach((bid, idx) => {
     let statusClass = '';
     if (bid.status === 'На проверке') statusClass = 'status-review';
     else if (bid.status === 'Согласована') statusClass = 'status-approved';
-    else if (bid.status === 'Отклонена') statusClass = 'status-rejected';
+    else statusClass = 'status-rejected';
 
-    row.insertCell(0).innerText = bid.noticeNumber;
+    // Файлы: через запятую
+    let filesText = '—';
+    if (bid.files && bid.files.length > 0) {
+      filesText = bid.files.map(f => f.name).join(', ');
+    }
+
+    const row = tbody.insertRow();
+    row.insertCell(0).innerText = bid.notice;
     row.insertCell(1).innerText = bid.company;
-    row.insertCell(2).innerText = Number(bid.nmck).toLocaleString('ru-RU');
-    row.insertCell(3).innerHTML = <span class="status ${statusClass}">${bid.status}</span>;
-    row.insertCell(4).innerText = bid.deadline;
+    row.insertCell(2).innerText = bid.nmck;
+    row.insertCell(3).innerText = filesText;
+    row.insertCell(4).innerHTML = `<span class="status ${statusClass}">${bid.status}</span>`;
+    row.insertCell(5).innerText = bid.deadline;
 
-    const actionsCell = row.insertCell(5);
+    const delCell = row.insertCell(6);
     const delBtn = document.createElement('button');
     delBtn.innerText = 'Удалить';
-    delBtn.className = 'delete-btn';
+    delBtn.classList.add('delete-btn');
     delBtn.onclick = () => {
-      bids.splice(index, 1);
+      bids.splice(idx, 1);
       renderTable();
     };
-    actionsCell.appendChild(delBtn);
+    delCell.appendChild(delBtn);
   });
 }
 
-// Добавление заявки
 function addBid() {
-  const noticeNumber = document.getElementById('noticeNumber').value.trim();
+  const notice = document.getElementById('notice').value.trim();
   const company = document.getElementById('company').value.trim();
-  let nmck = parseInt(document.getElementById('nmck').value, 10);
+  const nmck = parseInt(document.getElementById('nmck').value, 10) || 0;
+  const deadline = document.getElementById('deadline').value;
   const status = document.getElementById('status').value;
-  let deadline = document.getElementById('deadline').value;
+  const fileInput = document.getElementById('files');
 
-  if (!noticeNumber || !company) {
+  if (!notice || !company) {
     alert('Заполните номер извещения и организацию');
     return;
   }
-  if (isNaN(nmck)) nmck = 0;
   if (!deadline) {
-    deadline = new Date().toISOString().slice(0,10);
+    alert('Укажите срок подачи');
+    return;
+  }
+  if (fileInput.files.length === 0) {
+    alert('Выберите хотя бы один файл');
+    return;
+  }
+
+  // Сохраняем ВСЕ выбранные файлы
+  const files = [];
+  for (let i = 0; i < fileInput.files.length; i++) {
+    files.push(fileInput.files[i]);
   }
 
   bids.push({
-    noticeNumber: noticeNumber,
+    notice: notice,
     company: company,
     nmck: nmck,
+    deadline: deadline,
     status: status,
-    deadline: deadline
+    files: files
   });
 
   renderTable();
 
-  // Очистка полей
-  document.getElementById('noticeNumber').value = '';
+  // Очистка формы
+  document.getElementById('notice').value = '';
   document.getElementById('company').value = '';
   document.getElementById('nmck').value = '';
-  document.getElementById('status').selectedIndex = 0;
   document.getElementById('deadline').value = '';
-  document.getElementById('noticeNumber').focus();
+  document.getElementById('status').selectedIndex = 0;
+  document.getElementById('files').value = '';
 }
 
-// Навешиваем обработчики
 document.getElementById('addBtn').addEventListener('click', addBid);
-
-// Добавляем Enter на поля
-const inputs = ['noticeNumber', 'company', 'nmck', 'deadline'];
-inputs.forEach(id => {
-  const el = document.getElementById(id);
-  if (el) {
-    el.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') addBid();
-    });
-  }
-});
