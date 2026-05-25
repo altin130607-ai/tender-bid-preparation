@@ -1,3 +1,4 @@
+# Обновлена
 import sys
 import os
 import shutil
