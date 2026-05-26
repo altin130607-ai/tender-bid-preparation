@@ -2,106 +2,250 @@ import sys
 import os
 import shutil
 from PySide6.QtWidgets import (QApplication, QWidget, QLabel, QLineEdit,
-                               QPushButton, QVBoxLayout, QFormLayout,
-                               QFileDialog, QMessageBox, QGroupBox)
+                               QComboBox, QPushButton, QTableWidget, QTableWidgetItem,
+                               QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox,
+                               QFormLayout, QGroupBox)
 from PySide6.QtCore import Qt
 
-class MainWindow(QWidget):
+# ---------- Окно авторизации ----------
+class LoginWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Ввод данных для автоматизированной подготовки заявки")
-        self.setMinimumSize(600, 400)
+        self.setWindowTitle("Авторизация")
+        self.setFixedSize(350, 250)
+
+        layout = QVBoxLayout()
+
+        self.loginEdit = QLineEdit()
+        self.loginEdit.setPlaceholderText("Логин")
+        self.passwordEdit = QLineEdit()
+        self.passwordEdit.setPlaceholderText("Пароль")
+        self.passwordEdit.setEchoMode(QLineEdit.Password)
+
+        self.roleCombo = QComboBox()
+        self.roleCombo.addItems(["Специалист", "Руководитель"])
+
+        self.loginBtn = QPushButton("Войти")
+
+        layout.addWidget(QLabel("Логин:"))
+        layout.addWidget(self.loginEdit)
+        layout.addWidget(QLabel("Пароль:"))
+        layout.addWidget(self.passwordEdit)
+        layout.addWidget(QLabel("Роль:"))
+        layout.addWidget(self.roleCombo)
+        layout.addWidget(self.loginBtn)
+
+        self.setLayout(layout)
+        self.loginBtn.clicked.connect(self.check_auth)
+
+    def check_auth(self):
+        login = self.loginEdit.text().strip()
+        password = self.passwordEdit.text().strip()
+        role = self.roleCombo.currentText()
+
+        if (role == "Специалист" and login == "spec" and password == "1"):
+            self.main_window = MainWindow(role)
+            self.main_window.show()
+            self.close()
+        elif (role == "Руководитель" and login == "chief" and password == "1"):
+            QMessageBox.information(self, "Авторизация", "Успешная авторизация руководителя")
+            self.close()
+        else:
+            QMessageBox.warning(self, "Ошибка", "Неверный логин или пароль")
+
+
+# ---------- Основное окно (только для специалиста) ----------
+class MainWindow(QWidget):
+    def __init__(self, role):
+        super().__init__()
+        self.role = role
+        self.setWindowTitle(f"Подготовка тендерной заявки — {role}")
+        self.setMinimumSize(1000, 500)
 
         self.upload_dir = "uploaded_files"
         os.makedirs(self.upload_dir, exist_ok=True)
 
-        # ---- 1. Извещение и проект контракта ----
-        group1 = QGroupBox("1. Извещение о закупке и проект контракта")
-        form1 = QFormLayout()
+        self.bids = []
+
+        # Таблица (6 колонок)
+        self.table = QTableWidget(0, 6)
+        self.table.setHorizontalHeaderLabels([
+            "Номер извещения", "Себестоимость (₽)", "НДС (%)", "Рентабельность (%)", "Файлы", "Действия"
+        ])
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+
+        self.build_specialist_ui()
+
+        layout = QVBoxLayout()
+        layout.addLayout(self.input_layout)
+        layout.addWidget(self.table)
+        self.setLayout(layout)
+
+        self.load_test_data()
+
+    # ------------------------------------------------------------
+    # Для специалиста
+    # ------------------------------------------------------------
+    def build_specialist_ui(self):
+        self.input_layout = QVBoxLayout()
+
+        # Группа 1: Извещение и контракт
+        g1 = QGroupBox("Извещение и проект контракта")
+        f1 = QFormLayout()
         self.noticeEdit = QLineEdit()
-        self.noticeEdit.setPlaceholderText("Введите номер извещения")
-        self.contractBtn = QPushButton("Загрузить файл")
+        self.noticeEdit.setPlaceholderText("Номер извещения")
+        self.contractBtn = QPushButton("Загрузить проект контракта")
         self.contractLabel = QLabel("Файл не выбран")
         self.contractFile = None
-        form1.addRow("Номер извещения:", self.noticeEdit)
-        form1.addRow("Извещение / контракт:", self.contractBtn)
-        form1.addRow("", self.contractLabel)
-        group1.setLayout(form1)
+        f1.addRow("Номер извещения:", self.noticeEdit)
+        f1.addRow("Проект контракта:", self.contractBtn)
+        f1.addRow("", self.contractLabel)
+        g1.setLayout(f1)
+        self.input_layout.addWidget(g1)
 
-        # ---- 2. Учредительные и регистрационные документы ----
-        group2 = QGroupBox("2. Учредительные и регистрационные документы")
-        form2 = QFormLayout()
+        # Группа 2: Учредительные документы
+        g2 = QGroupBox("Учредительные документы")
+        f2 = QFormLayout()
         self.legalBtn = QPushButton("Загрузить документы")
         self.legalLabel = QLabel("Файлов: 0")
         self.legalFiles = []
-        form2.addRow("", self.legalBtn)
-        form2.addRow("", self.legalLabel)
-        group2.setLayout(form2)
+        f2.addRow("", self.legalBtn)
+        f2.addRow("", self.legalLabel)
+        g2.setLayout(f2)
+        self.input_layout.addWidget(g2)
 
-        # ---- 3. Экономические параметры ----
-        group3 = QGroupBox("3. Экономические параметры")
-        form3 = QFormLayout()
+        # Группа 3: Экономические параметры
+        g3 = QGroupBox("Экономические параметры")
+        f3 = QFormLayout()
         self.costEdit = QLineEdit()
         self.costEdit.setPlaceholderText("0.00")
         self.vatEdit = QLineEdit()
         self.vatEdit.setPlaceholderText("20")
         self.marginEdit = QLineEdit()
         self.marginEdit.setPlaceholderText("0")
-        form3.addRow("Себестоимость (₽):", self.costEdit)
-        form3.addRow("НДС (%):", self.vatEdit)
-        form3.addRow("Рентабельность (%):", self.marginEdit)
-        group3.setLayout(form3)
+        f3.addRow("Себестоимость (₽):", self.costEdit)
+        f3.addRow("НДС (%):", self.vatEdit)
+        f3.addRow("Рентабельность (%):", self.marginEdit)
+        g3.setLayout(f3)
+        self.input_layout.addWidget(g3)
 
-        # ---- Кнопка сохранения ----
-        self.saveBtn = QPushButton("Сохранить данные и запустить подготовку")
-        self.saveBtn.setStyleSheet("background-color: #2c7da0; color: white; font-weight: bold; padding: 10px;")
+        # Кнопки (только "Добавить заявку")
+        btn_layout = QHBoxLayout()
+        self.addBtn = QPushButton("Добавить заявку")
+        btn_layout.addWidget(self.addBtn)
+        self.input_layout.addLayout(btn_layout)
 
-        # ---- Макет ----
-        layout = QVBoxLayout()
-        layout.addWidget(group1)
-        layout.addWidget(group2)
-        layout.addWidget(group3)
-        layout.addWidget(self.saveBtn)
-        self.setLayout(layout)
-
-        # ---- Привязка кнопок ----
         self.contractBtn.clicked.connect(self.load_contract)
         self.legalBtn.clicked.connect(self.load_legal)
-        self.saveBtn.clicked.connect(self.save_data)
+        self.addBtn.clicked.connect(self.add_bid)
+
+        # ------------------------------------------------------------
+        # Загрузка файлов
+        # ------------------------------------------------------------
 
     def load_contract(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Выберите файл извещения или контракта")
-        if file_path:
-            dest = os.path.join(self.upload_dir, os.path.basename(file_path))
-            shutil.copy(file_path, dest)
+        path, _ = QFileDialog.getOpenFileName(self, "Выберите файл контракта")
+        if path:
+            dest = os.path.join(self.upload_dir, os.path.basename(path))
+            shutil.copy(path, dest)
             self.contractFile = dest
-            self.contractLabel.setText(os.path.basename(file_path))
+            self.contractLabel.setText(os.path.basename(path))
 
     def load_legal(self):
-        files, _ = QFileDialog.getOpenFileNames(self, "Выберите учредительные документы")
-        for f in files:
-            dest = os.path.join(self.upload_dir, os.path.basename(f))
-            shutil.copy(f, dest)
+        paths, _ = QFileDialog.getOpenFileNames(self, "Выберите учредительные документы")
+        for p in paths:
+            dest = os.path.join(self.upload_dir, os.path.basename(p))
+            shutil.copy(p, dest)
             self.legalFiles.append(dest)
         self.legalLabel.setText(f"Файлов: {len(self.legalFiles)}")
 
-    def save_data(self):
-        if not self.noticeEdit.text().strip():
+        # ------------------------------------------------------------
+        # Работа с заявками
+        # ------------------------------------------------------------
+
+    def add_bid(self):
+        notice = self.noticeEdit.text().strip()
+        if not notice:
             QMessageBox.warning(self, "Ошибка", "Введите номер извещения")
             return
         if not self.contractFile:
-            QMessageBox.warning(self, "Ошибка", "Загрузите файл извещения/контракта")
+            QMessageBox.warning(self, "Ошибка", "Загрузите контракт")
             return
-        if len(self.legalFiles) == 0:
+        if not self.legalFiles:
             QMessageBox.warning(self, "Ошибка", "Загрузите учредительные документы")
             return
 
-        QMessageBox.information(self, "Успех", "Данные сохранены. Система запускает автоматическую подготовку заявки.")
-        # Здесь в реальной системе запускался бы парсинг, расчёт, генерация документов
-        self.close()
+        try:
+            cost = float(self.costEdit.text() or 0)
+            vat = float(self.vatEdit.text() or 0)
+            margin = float(self.marginEdit.text() or 0)
+        except ValueError:
+            QMessageBox.warning(self, "Ошибка", "Проверьте введённые числа")
+            return
+
+        files_list = self.legalFiles.copy()
+        if self.contractFile:
+            files_list.append(self.contractFile)
+
+        self.bids.append({
+            "notice": notice,
+            "cost": cost,
+            "vat": vat,
+            "margin": margin,
+            "files": files_list
+        })
+        self.refresh_table()
+        self.clear_form()
+
+    def delete_bid_row(self, row):
+        self.bids.pop(row)
+        self.refresh_table()
+
+    def refresh_table(self):
+        self.table.setRowCount(0)
+        for idx, bid in enumerate(self.bids):
+            self.table.insertRow(idx)
+            self.table.setItem(idx, 0, QTableWidgetItem(bid["notice"]))
+            self.table.setItem(idx, 1, QTableWidgetItem(f"{bid['cost']:.2f}"))
+            self.table.setItem(idx, 2, QTableWidgetItem(f"{bid['vat']:.2f}"))
+            self.table.setItem(idx, 3, QTableWidgetItem(f"{bid['margin']:.2f}"))
+            files_str = ", ".join([os.path.basename(f) for f in bid["files"]])
+            self.table.setItem(idx, 4, QTableWidgetItem(files_str))
+
+            btn = QPushButton("Удалить")
+            btn.clicked.connect(lambda _, r=idx: self.delete_bid_row(r))
+            self.table.setCellWidget(idx, 5, btn)
+
+    def clear_form(self):
+        self.noticeEdit.clear()
+        self.costEdit.clear()
+        self.vatEdit.setText("20")
+        self.marginEdit.clear()
+        self.contractFile = None
+        self.contractLabel.setText("Файл не выбран")
+        self.legalFiles.clear()
+        self.legalLabel.setText("Файлов: 0")
+
+    def load_test_data(self):
+        self.bids.append({
+            "notice": "0348300000125000015",
+            "cost": 2000000.00,
+            "vat": 20.00,
+            "margin": 15.00,
+            "files": ["contract_1.pdf", "ustav_ooo.pdf", "inn_ooo.pdf"]
+        })
+        self.bids.append({
+            "notice": "223-12345678-01",
+            "cost": 700000.00,
+            "vat": 20.00,
+            "margin": 12.00,
+            "files": ["contract_2.pdf", "ustav_ao.pdf", "inn_ao.pdf", "egrul_ao.pdf"]
+        })
+        self.refresh_table()
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
+    login = LoginWindow()
+    login.show()
     sys.exit(app.exec())
